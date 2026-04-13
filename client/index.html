@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediCore — Hospital Management</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">
+      <span class="logo-cross">✚</span>
+      <span class="logo-text">MediCore</span>
+    </div>
+    <nav>
+      <a href="#" class="nav-item active" data-section="dashboard">
+        <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <a href="#" class="nav-item" data-section="patients">
+        <span class="nav-icon">◉</span> Patients
+      </a>
+      <a href="#" class="nav-item" data-section="doctors">
+        <span class="nav-icon">◎</span> Doctors
+      </a>
+      <a href="#" class="nav-item" data-section="nurses">
+        <span class="nav-icon">◍</span> Nurses
+      </a>
+      <a href="#" class="nav-item" data-section="rooms">
+        <span class="nav-icon">▣</span> Rooms
+      </a>
+      <a href="#" class="nav-item" data-section="bills">
+        <span class="nav-icon">◈</span> Bills
+      </a>
+      <a href="#" class="nav-item" data-section="test-reports">
+        <span class="nav-icon">◐</span> Test Reports
+      </a>
+      <a href="#" class="nav-item" data-section="records">
+        <span class="nav-icon">▦</span> Records
+      </a>
+    </nav>
+    <div class="sidebar-footer">Hospital v1.0</div>
+  </div>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title" id="section-title">Dashboard</div>
+      <div class="topbar-right">
+        <div class="search-box">
+          <input type="text" placeholder="Search…" id="globalSearch" />
+        </div>
+        <div class="avatar">A</div>
+      </div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="section active">
+      <div class="stats-grid">
+        <div class="stat-card" id="stat-patients">
+          <div class="stat-label">Patients</div>
+          <div class="stat-value" id="count-patients">–</div>
+        </div>
+        <div class="stat-card" id="stat-doctors">
+          <div class="stat-label">Doctors</div>
+          <div class="stat-value" id="count-doctors">–</div>
+        </div>
+        <div class="stat-card" id="stat-rooms">
+          <div class="stat-label">Rooms</div>
+          <div class="stat-value" id="count-rooms">–</div>
+        </div>
+        <div class="stat-card" id="stat-bills">
+          <div class="stat-label">Total Bills (₹)</div>
+          <div class="stat-value" id="count-bills">–</div>
+        </div>
+      </div>
+      <div class="dashboard-tables">
+        <div class="card">
+          <div class="card-header">Recent Patients</div>
+          <table class="data-table" id="recent-patients-table">
+            <thead><tr><th>ID</th><th>Name</th><th>Age</th><th>Gender</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-header">Room Availability</div>
+          <table class="data-table" id="room-avail-table">
+            <thead><tr><th>R-ID</th><th>Type</th><th>Capacity</th><th>Available</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PATIENTS -->
+    <section id="patients" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Patients</h2>
+        <button class="btn-primary" onclick="openModal('patient-modal')">+ Add Patient</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="patients-table">
+          <thead><tr><th>P-ID</th><th>Name</th><th>DOB</th><th>Age</th><th>Gender</th><th>Mob-No</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- DOCTORS -->
+    <section id="doctors" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Doctors</h2>
+        <button class="btn-primary" onclick="openModal('doctor-modal')">+ Add Doctor</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="doctors-table">
+          <thead><tr><th>E-ID</th><th>Name</th><th>Dept</th><th>Qualification</th><th>Salary</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- NURSES -->
+    <section id="nurses" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Nurses</h2>
+        <button class="btn-primary" onclick="openModal('nurse-modal')">+ Add Nurse</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="nurses-table">
+          <thead><tr><th>E-ID</th><th>Name</th><th>Sex</th><th>Salary</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ROOMS -->
+    <section id="rooms" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Rooms</h2>
+        <button class="btn-primary" onclick="openModal('room-modal')">+ Add Room</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="rooms-table">
+          <thead><tr><th>R-ID</th><th>Type</th><th>Capacity</th><th>Availability</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- BILLS -->
+    <section id="bills" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Bills</h2>
+        <button class="btn-primary" onclick="openModal('bill-modal')">+ Add Bill</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="bills-table">
+          <thead><tr><th>B-ID</th><th>P-ID</th><th>Amount (₹)</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TEST REPORTS -->
+    <section id="test-reports" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Test Reports</h2>
+        <button class="btn-primary" onclick="openModal('report-modal')">+ Add Report</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="reports-table">
+          <thead><tr><th>P-ID</th><th>R-ID</th><th>Test Type</th><th>Result</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- RECORDS -->
+    <section id="records" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Records</h2>
+        <button class="btn-primary" onclick="openModal('record-modal')">+ Add Record</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="records-table">
+          <thead><tr><th>Record-No</th><th>App-No</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODALS -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal()"></div>
+
+  <!-- Patient Modal -->
+  <div class="modal" id="patient-modal">
+    <div class="modal-header"><span>Patient Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="p-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="p-name" placeholder="Full Name" /></div>
+      <div class="form-group"><label>DOB</label><input type="date" id="p-dob" /></div>
+      <div class="form-group"><label>Age</label><input type="number" id="p-age" placeholder="Age" /></div>
+      <div class="form-group"><label>Gender</label>
+        <select id="p-gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Mobile No</label><input type="text" id="p-mob" placeholder="10-digit number" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="savePatient()">Save</button>
+    </div>
+  </div>
+
+  <!-- Doctor Modal -->
+  <div class="modal" id="doctor-modal">
+    <div class="modal-header"><span>Doctor Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="d-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="d-name" placeholder="Full Name" /></div>
+      <div class="form-group"><label>Department</label><input type="text" id="d-dept" placeholder="Dept" /></div>
+      <div class="form-group"><label>Qualification</label><input type="text" id="d-qual" placeholder="MBBS, MD..." /></div>
+      <div class="form-group"><label>Salary</label><input type="number" id="d-salary" placeholder="₹" /></div>
+      <div class="form-group"><label>Mobile No</label><input type="text" id="d-mob" placeholder="10-digit" /></div>
+      <div class="form-group"><label>Address</label><input type="text" id="d-address" placeholder="Address" /></div>
+      <div class="form-group"><label>City</label><input type="text" id="d-city" /></div>
+      <div class="form-group"><label>State</label><input type="text" id="d-state" /></div>
+      <div class="form-group"><label>Pin No</label><input type="text" id="d-pin" /></div>
+      <div class="form-group"><label>Sex</label>
+        <select id="d-sex"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveDoctor()">Save</button>
+    </div>
+  </div>
+
+  <!-- Nurse Modal -->
+  <div class="modal" id="nurse-modal">
+    <div class="modal-header"><span>Nurse Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="n-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="n-name" placeholder="Full Name" /></div>
+      <div class="form-group"><label>Sex</label>
+        <select id="n-sex"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Salary</label><input type="number" id="n-salary" placeholder="₹" /></div>
+      <div class="form-group"><label>Mobile No</label><input type="text" id="n-mob" /></div>
+      <div class="form-group"><label>Address</label><input type="text" id="n-address" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveNurse()">Save</button>
+    </div>
+  </div>
+
+  <!-- Room Modal -->
+  <div class="modal" id="room-modal">
+    <div class="modal-header"><span>Room Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="r-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Type</label><input type="text" id="r-type" placeholder="General / ICU / Private" /></div>
+      <div class="form-group"><label>Capacity</label><input type="number" id="r-capacity" /></div>
+      <div class="form-group"><label>Availability</label>
+        <select id="r-avail"><option value="1">Available</option><option value="0">Occupied</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveRoom()">Save</button>
+    </div>
+  </div>
+
+  <!-- Bill Modal -->
+  <div class="modal" id="bill-modal">
+    <div class="modal-header"><span>Bill Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="b-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Patient ID (P-ID)</label><input type="number" id="b-pid" /></div>
+      <div class="form-group"><label>Amount (₹)</label><input type="number" id="b-amount" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveBill()">Save</button>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div class="modal" id="report-modal">
+    <div class="modal-header"><span>Test Report</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Patient ID</label><input type="number" id="rp-pid" /></div>
+      <div class="form-group"><label>Room ID</label><input type="number" id="rp-rid" /></div>
+      <div class="form-group"><label>Test Type</label><input type="text" id="rp-type" placeholder="Blood, X-ray…" /></div>
+      <div class="form-group"><label>Result</label><input type="text" id="rp-result" placeholder="Normal / Abnormal…" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveReport()">Save</button>
+    </div>
+  </div>
+
+  <!-- Record Modal -->
+  <div class="modal" id="record-modal">
+    <div class="modal-header"><span>Record Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="rec-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>App No</label><input type="text" id="rec-appno" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveRecord()">Save</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+
+</body>
+</html>
