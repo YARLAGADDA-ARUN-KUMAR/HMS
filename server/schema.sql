@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS Patient (
   `Mob-No`  CHAR(10)
 ) ENGINE=InnoDB;
 
--- ── Employee (supertype for Doctor, Nurse, Receptionist) ──
+-- ── Employee (supertype for Doctor) ────────────────────────
 CREATE TABLE IF NOT EXISTS Employee (
   `E-ID`    INT          AUTO_INCREMENT PRIMARY KEY,
   Name      VARCHAR(100) NOT NULL,
@@ -40,18 +40,9 @@ CREATE TABLE IF NOT EXISTS Doctor (
   FOREIGN KEY (`E-ID`) REFERENCES Employee(`E-ID`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ── Nurse (ISA Employee) ──────────────────────────
-CREATE TABLE IF NOT EXISTS Nurse (
-  `E-ID`  INT PRIMARY KEY,
-  Sex     ENUM('Male','Female','Other'),
-  FOREIGN KEY (`E-ID`) REFERENCES Employee(`E-ID`) ON DELETE CASCADE
-) ENGINE=InnoDB;
 
--- ── Receptionist (ISA Employee) ───────────────────
-CREATE TABLE IF NOT EXISTS Receptionist (
-  `E-ID`  INT PRIMARY KEY,
-  FOREIGN KEY (`E-ID`) REFERENCES Employee(`E-ID`) ON DELETE CASCADE
-) ENGINE=InnoDB;
+
+
 
 -- ── Rooms ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Rooms (
@@ -61,30 +52,9 @@ CREATE TABLE IF NOT EXISTS Rooms (
   Availability TINYINT(1)   DEFAULT 1
 ) ENGINE=InnoDB;
 
--- ── Bills ─────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS Bills (
-  `B-ID`   INT          AUTO_INCREMENT PRIMARY KEY,
-  `P-ID`   INT,
-  Amount   DECIMAL(10,2),
-  FOREIGN KEY (`P-ID`) REFERENCES Patient(`P-ID`) ON DELETE SET NULL
-) ENGINE=InnoDB;
 
--- ── Test_Report ───────────────────────────────────
-CREATE TABLE IF NOT EXISTS Test_Report (
-  id          INT          AUTO_INCREMENT PRIMARY KEY,
-  `P-ID`      INT,
-  `R-ID`      INT,
-  `Test-Type` VARCHAR(100),
-  Result      VARCHAR(200),
-  FOREIGN KEY (`P-ID`) REFERENCES Patient(`P-ID`) ON DELETE SET NULL,
-  FOREIGN KEY (`R-ID`) REFERENCES Rooms(`R-ID`)   ON DELETE SET NULL
-) ENGINE=InnoDB;
 
--- ── Records (maintained by Receptionist) ─────────
-CREATE TABLE IF NOT EXISTS Records (
-  `Record-no`  INT AUTO_INCREMENT PRIMARY KEY,
-  `App-no`     VARCHAR(50)
-) ENGINE=InnoDB;
+
 
 -- ── Consults (Patient M:N Doctor) ─────────────────
 CREATE TABLE IF NOT EXISTS Consults (
@@ -104,23 +74,9 @@ CREATE TABLE IF NOT EXISTS Assigned (
   FOREIGN KEY (`R-ID`) REFERENCES Rooms(`R-ID`)   ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ── Governs (Nurse M:M Rooms) ─────────────────────
-CREATE TABLE IF NOT EXISTS Governs (
-  `E-ID`  INT,
-  `R-ID`  INT,
-  PRIMARY KEY (`E-ID`, `R-ID`),
-  FOREIGN KEY (`E-ID`) REFERENCES Nurse(`E-ID`)  ON DELETE CASCADE,
-  FOREIGN KEY (`R-ID`) REFERENCES Rooms(`R-ID`)  ON DELETE CASCADE
-) ENGINE=InnoDB;
 
--- ── Maintains (Receptionist M:M Records) ─────────
-CREATE TABLE IF NOT EXISTS Maintains (
-  `E-ID`      INT,
-  `Record-no` INT,
-  PRIMARY KEY (`E-ID`, `Record-no`),
-  FOREIGN KEY (`E-ID`)      REFERENCES Receptionist(`E-ID`)  ON DELETE CASCADE,
-  FOREIGN KEY (`Record-no`) REFERENCES Records(`Record-no`)  ON DELETE CASCADE
-) ENGINE=InnoDB;
+
+
 
 -- ── Sample Data ───────────────────────────────────
 INSERT INTO Patient (Name, DOB, Age, Gender, `Mob-No`) VALUES
@@ -131,17 +87,11 @@ INSERT INTO Patient (Name, DOB, Age, Gender, `Mob-No`) VALUES
 
 INSERT INTO Employee (Name, Salary, `Mob-No`, Address, City, State, `Pin-no`) VALUES
   ('Dr. S. Prasad',  95000, '9000011111', '12 Gandhi Rd',    'Kurnool',    'Andhra Pradesh', '518001'),
-  ('Dr. A. Verma',   88000, '9000022222', '5 Nehru Street',  'Hyderabad',  'Telangana',      '500001'),
-  ('Nurse Kavya',    35000, '9000033333', '7 MG Road',       'Kurnool',    'Andhra Pradesh', '518002'),
-  ('Nurse Deepa',    33000, '9000044444', '3 Lake View',     'Vijayawada', 'Andhra Pradesh', '520001');
+  ('Dr. A. Verma',   88000, '9000022222', '5 Nehru Street',  'Hyderabad',  'Telangana',      '500001');
 
 INSERT INTO Doctor (`E-ID`, Dept, Qualification, Sex) VALUES
   (1, 'Cardiology',  'MD, DM Cardiology',  'Male'),
   (2, 'Orthopedics', 'MS Ortho',           'Male');
-
-INSERT INTO Nurse (`E-ID`, Sex) VALUES
-  (3, 'Female'),
-  (4, 'Female');
 
 INSERT INTO Rooms (Type, Capacity, Availability) VALUES
   ('General', 6, 1),
@@ -149,44 +99,45 @@ INSERT INTO Rooms (Type, Capacity, Availability) VALUES
   ('Private', 1, 0),
   ('Semi-Private', 2, 1);
 
-INSERT INTO Bills (`P-ID`, Amount) VALUES
-  (1, 12500.00),
-  (2, 8750.50),
-  (3, 3200.00);
+-- ── Appointments Sample Data ────────────────────
+INSERT INTO Appointment (`P-ID`, `D-E-ID`, `R-ID`, `Scheduled-At`, Status, Notes) VALUES
+  (1, 1, 1, '2026-04-20 09:00:00', 'Scheduled', 'Routine cardiac checkup'),
+  (2, 2, 2, '2026-04-21 10:30:00', 'Completed', 'Post-surgery follow-up'),
+  (3, 1, NULL, '2026-04-22 14:00:00', 'Scheduled', 'Initial consultation'),
+  (4, 2, 1, '2026-04-23 11:00:00', 'Scheduled', 'Orthopedic examination');
 
-INSERT INTO Test_Report (`P-ID`, `R-ID`, `Test-Type`, Result) VALUES
-  (1, 2, 'Blood Test',  'Normal'),
-  (2, 1, 'X-Ray',       'Fracture detected'),
-  (3, 1, 'ECG',         'Normal');
+-- ── Medications Sample Data ──────────────────────
+INSERT INTO Medication (`Name`, `Dosage-Form`, `Manufacturer`) VALUES
+  ('Aspirin', 'Tablet', 'Bayer'),
+  ('Lisinopril', 'Tablet', 'AstraZeneca'),
+  ('Metformin', 'Tablet', 'Merck'),
+  ('Amoxicillin', 'Capsule', 'Pfizer'),
+  ('Ibuprofen', 'Tablet', 'Johnson & Johnson'),
+  ('Omeprazole', 'Capsule', 'Abbott'),
+  ('Atorvastatin', 'Tablet', 'Cipla'),
+  ('Cetirizine', 'Tablet', 'Sun Pharma');
 
-INSERT INTO Records (`App-no`) VALUES ('APP-2024-001'), ('APP-2024-002');
+-- ── Prescriptions Sample Data ────────────────────
+INSERT INTO Prescription (`P-ID`, `D-E-ID`, `Created-At`, `Notes`) VALUES
+  (1, 1, '2026-04-18 09:30:00', 'Post-consultation prescription for heart health'),
+  (2, 2, '2026-04-17 14:00:00', 'Pain management post-surgery'),
+  (3, 1, '2026-04-19 10:00:00', 'Initial treatment plan'),
+  (4, 2, '2026-04-16 15:30:00', 'Inflammation and pain relief');
 
--- ── Auth (Login) ─────────────────────────────────────
--- Tables for JWT login
-CREATE TABLE IF NOT EXISTS Role (
-  `Role-ID` INT AUTO_INCREMENT PRIMARY KEY,
-  `Name`     VARCHAR(50) NOT NULL UNIQUE
-) ENGINE=InnoDB;
+-- ── Prescription Items Sample Data ──────────────
+INSERT INTO PrescriptionItem (`PR-ID`, `MED-ID`, `Dosage`, `Instructions`) VALUES
+  (1, 1, '100 mg', 'Once daily after breakfast'),
+  (1, 2, '10 mg', 'Once daily in the evening'),
+  (2, 5, '400 mg', 'Every 6 hours with food'),
+  (2, 6, '20 mg', 'Once daily before meals'),
+  (3, 3, '500 mg', 'Twice daily with meals'),
+  (3, 8, '10 mg', 'Once daily at bedtime'),
+  (4, 5, '600 mg', 'Every 8 hours with food'),
+  (4, 7, '20 mg', 'Once daily in the evening');
 
-CREATE TABLE IF NOT EXISTS AuthUser (
-  `U-ID`          INT AUTO_INCREMENT PRIMARY KEY,
-  `E-ID`          INT NULL,
-  `Username`     VARCHAR(80)  NOT NULL UNIQUE,
-  `Password-Hash` VARCHAR(255) NOT NULL,
-  `Role-ID`       INT NOT NULL,
-  `Is-Active`     TINYINT(1) DEFAULT 1,
-  `Created-At`    DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (`E-ID`) REFERENCES Employee(`E-ID`) ON DELETE SET NULL,
-  FOREIGN KEY (`Role-ID`) REFERENCES Role(`Role-ID`) ON DELETE RESTRICT
-) ENGINE=InnoDB;
 
--- Seed roles (safe to re-run)
-INSERT INTO Role (`Name`) VALUES
-  ('admin'),
-  ('doctor'),
-  ('nurse'),
-  ('receptionist')
-ON DUPLICATE KEY UPDATE `Name` = VALUES(`Name`);
+
+
 
 -- ── Appointments ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS Appointment (
