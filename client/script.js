@@ -1,6 +1,11 @@
 /* ── Config ─────────────────────────────────────── */
 const API = 'http://localhost:3000/api';
 
+/* ── Auth State ─────────────────────────────────── */
+let token = localStorage.getItem('token');
+let user = null;
+try { user = JSON.parse(localStorage.getItem('user')); } catch (e) {}
+
 /* ── Navigation ─────────────────────────────────── */
 const navItems = document.querySelectorAll('.nav-item');
 const sections = document.querySelectorAll('.section');
@@ -22,10 +27,13 @@ navItems.forEach(item => {
 function loadSection(name) {
   switch (name) {
     case 'dashboard':  loadDashboard(); break;
+    case 'appointments': loadAppointments(); break;
     case 'patients':   loadPatients();  break;
     case 'doctors':    loadDoctors();   break;
     case 'nurses':     loadNurses();    break;
     case 'rooms':      loadRooms();     break;
+    case 'medications': loadMedications(); break;
+    case 'prescriptions': loadPrescriptions(); break;
     case 'bills':      loadBills();     break;
     case 'test-reports': loadReports(); break;
     case 'records':    loadRecords();   break;
@@ -69,17 +77,73 @@ async function api(path, method = 'GET', body = null) {
     method,
     headers: { 'Content-Type': 'application/json' }
   };
+  if (token) {
+    opts.headers['Authorization'] = `Bearer ${token}`;
+  }
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${API}${path}`, opts);
-  if (!res.ok) throw new Error(await res.text());
+  if (res.status === 401 && path !== '/auth/login') {
+    logout();
+    throw new Error('Session expired. Please log in.');
+  }
+  if (!res.ok) {
+    let errText = await res.text();
+    try { const j = JSON.parse(errText); if(j.error) errText = j.error; } catch(e){}
+    throw new Error(errText);
+  }
   return res.json();
+}
+
+/* ── Auth Flow ──────────────────────────────────── */
+function checkAuth() {
+  if (!token || !user) {
+    document.getElementById('login-overlay').classList.add('active');
+  } else {
+    document.getElementById('login-overlay').classList.remove('active');
+    document.getElementById('user-avatar').textContent = user.username.charAt(0).toUpperCase();
+    loadDashboard();
+  }
+}
+
+async function login() {
+  const u = document.getElementById('login-username').value;
+  const p = document.getElementById('login-password').value;
+  if (!u || !p) {
+    document.getElementById('login-error').textContent = 'Please enter both fields';
+    return;
+  }
+  try {
+    const res = await api('/auth/login', 'POST', { username: u, password: p });
+    token = res.token;
+    user = res.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    document.getElementById('login-error').textContent = '';
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    checkAuth();
+    showToast(`Welcome back, ${user.username}!`);
+  } catch (err) {
+    document.getElementById('login-error').textContent = err.message;
+  }
+}
+
+function logout() {
+  token = null;
+  user = null;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  checkAuth();
 }
 
 /* ── Dashboard ──────────────────────────────────── */
 async function loadDashboard() {
   try {
     const [patients, doctors, rooms, bills] = await Promise.all([
-      api('/patients'), api('/doctors'), api('/rooms'), api('/bills')
+      api('/patients').catch(()=>[]), 
+      api('/doctors').catch(()=>[]), 
+      api('/rooms').catch(()=>[]), 
+      api('/bills').catch(()=>[])
     ]);
 
     document.getElementById('count-patients').textContent = patients.length;
@@ -108,7 +172,77 @@ async function loadDashboard() {
           ? '<span class="badge badge-green">Yes</span>'
           : '<span class="badge badge-red">No</span>'}</td>
       </tr>`).join('');
-  } catch (err) { showToast('Could not load dashboard: ' + err.message, true); }
+  } catch (err) { showToast('Could not load dashboard', true); }
+}
+
+/* ── APPOINTMENTS ───────────────────────────────── */
+async function loadAppointments() {
+  try {
+    const rows = await api('/appointments');
+    const tbody = document.querySelector('#appointments-table tbody');
+    tbody.innerHTML = rows.map(a => `
+      <tr>
+        <td>${a['A-ID']}</td>
+        <td>#${a['P-ID']} ${a.PatientName}</td>
+        <td>Dr. ${a.DoctorName}</td>
+        <td>${a['R-ID']||'-'}</td>
+        <td>${a['Scheduled-At'] ? new Date(a['Scheduled-At']).toLocaleString() : '-'}</td>
+        <td>${a.Status}</td>
+        <td>${a.Notes || ''}</td>
+        <td>
+          <button class="btn-icon btn-edit" onclick="editAppointment(${a['A-ID']})">✎</button>
+          <button class="btn-icon btn-del"  onclick="deleteAppointment(${a['A-ID']})">✕</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) { showToast('Error loading appointments', true); }
+}
+
+async function saveAppointment() {
+  const id = document.getElementById('a-id-hidden').value;
+  let scheduledAt = document.getElementById('a-scheduled').value;
+  if (scheduledAt) {
+     scheduledAt = new Date(scheduledAt).toISOString().slice(0, 19).replace('T', ' ');
+  }
+  const payload = {
+    'P-ID': document.getElementById('a-pid').value,
+    'D-E-ID': document.getElementById('a-did').value,
+    'R-ID': document.getElementById('a-rid').value || null,
+    'Scheduled-At': scheduledAt,
+    Status: document.getElementById('a-status').value,
+    Notes: document.getElementById('a-notes').value
+  };
+  try {
+    if (id) await api(`/appointments/${id}`, 'PUT', payload);
+    else    await api('/appointments', 'POST', payload);
+    showToast('Appointment saved!');
+    closeModal();
+    loadAppointments();
+  } catch (err) { showToast('Error: ' + err.message, true); }
+}
+
+async function editAppointment(id) {
+  try {
+    const a = await api(`/appointments/${id}`);
+    document.getElementById('a-id-hidden').value = a['A-ID'];
+    document.getElementById('a-pid').value       = a['P-ID'];
+    document.getElementById('a-did').value       = a['D-E-ID'];
+    document.getElementById('a-rid').value       = a['R-ID'] || '';
+    if (a['Scheduled-At']) {
+      document.getElementById('a-scheduled').value = new Date(new Date(a['Scheduled-At']).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16);
+    }
+    document.getElementById('a-status').value    = a.Status;
+    document.getElementById('a-notes').value     = a.Notes || '';
+    openModal('appointment-modal');
+  } catch (err) { showToast('Could not load appointment', true); }
+}
+
+async function deleteAppointment(id) {
+  if (!confirm('Delete appointment #' + id + '?')) return;
+  try {
+    await api(`/appointments/${id}`, 'DELETE');
+    showToast('Appointment deleted');
+    loadAppointments();
+  } catch (err) { showToast('Error deleting', true); }
 }
 
 /* ── PATIENTS ───────────────────────────────────── */
@@ -360,6 +494,174 @@ async function deleteRoom(id) {
   } catch (err) { showToast('Error deleting', true); }
 }
 
+/* ── MEDICATIONS ────────────────────────────────── */
+async function loadMedications() {
+  try {
+    const rows = await api('/medications');
+    const tbody = document.querySelector('#medications-table tbody');
+    tbody.innerHTML = rows.map(m => `
+      <tr>
+        <td>${m['MED-ID']}</td>
+        <td>${m.Name}</td>
+        <td>${m['Dosage-Form']}</td>
+        <td>${m.Manufacturer || '-'}</td>
+        <td>
+          <button class="btn-icon btn-edit" onclick="editMedication(${m['MED-ID']})">✎</button>
+          <button class="btn-icon btn-del"  onclick="deleteMedication(${m['MED-ID']})">✕</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) { showToast('Error loading medications', true); }
+}
+
+async function saveMedication() {
+  const id = document.getElementById('m-id-hidden').value;
+  const payload = {
+    Name: document.getElementById('m-name').value,
+    'Dosage-Form': document.getElementById('m-form').value,
+    Manufacturer: document.getElementById('m-manu').value
+  };
+  try {
+    if (id) await api(`/medications/${id}`, 'PUT', payload);
+    else    await api('/medications', 'POST', payload);
+    showToast('Medication saved!');
+    closeModal();
+    loadMedications();
+  } catch (err) { showToast('Error: ' + err.message, true); }
+}
+
+async function editMedication(id) {
+  try {
+    const m = await api(`/medications/${id}`);
+    document.getElementById('m-id-hidden').value = m['MED-ID'];
+    document.getElementById('m-name').value     = m.Name;
+    document.getElementById('m-form').value     = m['Dosage-Form'] || '';
+    document.getElementById('m-manu').value     = m.Manufacturer || '';
+    openModal('medication-modal');
+  } catch (err) { showToast('Could not load medication', true); }
+}
+
+async function deleteMedication(id) {
+  if (!confirm('Delete medication #' + id + '?')) return;
+  try {
+    await api(`/medications/${id}`, 'DELETE');
+    showToast('Medication deleted');
+    loadMedications();
+  } catch (err) { showToast('Error deleting', true); }
+}
+
+/* ── PRESCRIPTIONS ──────────────────────────────── */
+async function loadPrescriptions() {
+  try {
+    const rows = await api('/prescriptions');
+    const tbody = document.querySelector('#prescriptions-table tbody');
+    tbody.innerHTML = rows.map(pr => `
+      <tr>
+        <td>${pr['PR-ID']}</td>
+        <td>#${pr['P-ID']} ${pr.PatientName}</td>
+        <td>Dr. ${pr.DoctorName}</td>
+        <td>${pr['Created-At'] ? new Date(pr['Created-At']).toLocaleString() : '-'}</td>
+        <td>${pr.Notes || ''}</td>
+        <td>
+          <button class="btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="managePrescriptionItems(${pr['PR-ID']})">Manage Items</button>
+        </td>
+        <td>
+          <button class="btn-icon btn-edit" onclick="editPrescription(${pr['PR-ID']})">✎</button>
+          <button class="btn-icon btn-del"  onclick="deletePrescription(${pr['PR-ID']})">✕</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) { showToast('Error loading prescriptions', true); }
+}
+
+async function savePrescription() {
+  const id = document.getElementById('pr-id-hidden').value;
+  const payload = {
+    'P-ID': document.getElementById('pr-pid').value,
+    'D-E-ID': document.getElementById('pr-did').value,
+    Notes: document.getElementById('pr-notes').value
+  };
+  try {
+    if (id) await api(`/prescriptions/${id}`, 'PUT', payload);
+    else    await api('/prescriptions', 'POST', payload);
+    showToast('Prescription saved!');
+    closeModal();
+    loadPrescriptions();
+  } catch (err) { showToast('Error: ' + err.message, true); }
+}
+
+async function editPrescription(id) {
+  try {
+    const pr = await api(`/prescriptions/${id}`);
+    document.getElementById('pr-id-hidden').value = pr['PR-ID'];
+    document.getElementById('pr-pid').value       = pr['P-ID'];
+    document.getElementById('pr-did').value       = pr['D-E-ID'];
+    document.getElementById('pr-notes').value     = pr.Notes || '';
+    openModal('prescription-modal');
+  } catch (err) { showToast('Could not load prescription', true); }
+}
+
+async function deletePrescription(id) {
+  if (!confirm('Delete prescription #' + id + '?')) return;
+  try {
+    await api(`/prescriptions/${id}`, 'DELETE');
+    showToast('Prescription deleted');
+    loadPrescriptions();
+  } catch (err) { showToast('Error deleting', true); }
+}
+
+/* ── PRESCRIPTION ITEMS ─────────────────────────── */
+async function managePrescriptionItems(prId) {
+  document.getElementById('pri-prid-hidden').value = prId;
+  document.getElementById('pri-title').textContent = 'Prescription Items (PR-' + prId + ')';
+  document.getElementById('pri-medid').value = '';
+  document.getElementById('pri-dosage').value = '';
+  document.getElementById('pri-instructions').value = '';
+  openModal('prescription-items-modal');
+  await reloadPrescriptionItems(prId);
+}
+
+async function reloadPrescriptionItems(prId) {
+  try {
+    const items = await api(`/prescriptions/${prId}/items`);
+    const tbody = document.querySelector('#prescription-items-table tbody');
+    tbody.innerHTML = items.map(i => `
+      <tr>
+        <td>#${i['MED-ID']} ${i.MedicationName}</td>
+        <td>${i.Dosage}</td>
+        <td>${i.Instructions || '-'}</td>
+        <td>
+          <button class="btn-icon btn-del" onclick="deletePrescriptionItem(${prId}, ${i['MED-ID']})">✕</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) { showToast('Error loading items', true); }
+}
+
+async function savePrescriptionItem() {
+  const prId = document.getElementById('pri-prid-hidden').value;
+  const payload = {
+    'MED-ID': document.getElementById('pri-medid').value,
+    Dosage: document.getElementById('pri-dosage').value,
+    Instructions: document.getElementById('pri-instructions').value
+  };
+  try {
+    await api(`/prescriptions/${prId}/items`, 'POST', payload);
+    showToast('Item added/updated');
+    document.getElementById('pri-medid').value = '';
+    document.getElementById('pri-dosage').value = '';
+    document.getElementById('pri-instructions').value = '';
+    reloadPrescriptionItems(prId);
+  } catch (err) { showToast('Error: ' + err.message, true); }
+}
+
+async function deletePrescriptionItem(prId, medId) {
+  if (!confirm('Remove this item?')) return;
+  try {
+    await api(`/prescriptions/${prId}/items/${medId}`, 'DELETE');
+    showToast('Item deleted');
+    reloadPrescriptionItems(prId);
+  } catch (err) { showToast('Error deleting item', true); }
+}
+
+
 /* ── BILLS ──────────────────────────────────────── */
 async function loadBills() {
   try {
@@ -452,10 +754,17 @@ async function loadRecords() {
         <td>${r['Record-no']}</td>
         <td>${r['App-no']}</td>
         <td>
+          <button class="btn-icon btn-edit" onclick="editRecord(${r['Record-no']}, '${r['App-no']}')">✎</button>
           <button class="btn-icon btn-del" onclick="deleteRecord(${r['Record-no']})">✕</button>
         </td>
       </tr>`).join('');
   } catch (err) { showToast('Error loading records', true); }
+}
+
+async function editRecord(id, appno) {
+  document.getElementById('rec-id-hidden').value = id;
+  document.getElementById('rec-appno').value = appno;
+  openModal('record-modal');
 }
 
 async function saveRecord() {
@@ -488,4 +797,4 @@ document.getElementById('globalSearch').addEventListener('input', function () {
 });
 
 /* ── Init ───────────────────────────────────────── */
-loadDashboard();
+checkAuth();

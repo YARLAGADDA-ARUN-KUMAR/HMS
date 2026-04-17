@@ -160,3 +160,73 @@ INSERT INTO Test_Report (`P-ID`, `R-ID`, `Test-Type`, Result) VALUES
   (3, 1, 'ECG',         'Normal');
 
 INSERT INTO Records (`App-no`) VALUES ('APP-2024-001'), ('APP-2024-002');
+
+-- ── Auth (Login) ─────────────────────────────────────
+-- Tables for JWT login
+CREATE TABLE IF NOT EXISTS Role (
+  `Role-ID` INT AUTO_INCREMENT PRIMARY KEY,
+  `Name`     VARCHAR(50) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS AuthUser (
+  `U-ID`          INT AUTO_INCREMENT PRIMARY KEY,
+  `E-ID`          INT NULL,
+  `Username`     VARCHAR(80)  NOT NULL UNIQUE,
+  `Password-Hash` VARCHAR(255) NOT NULL,
+  `Role-ID`       INT NOT NULL,
+  `Is-Active`     TINYINT(1) DEFAULT 1,
+  `Created-At`    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`E-ID`) REFERENCES Employee(`E-ID`) ON DELETE SET NULL,
+  FOREIGN KEY (`Role-ID`) REFERENCES Role(`Role-ID`) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- Seed roles (safe to re-run)
+INSERT INTO Role (`Name`) VALUES
+  ('admin'),
+  ('doctor'),
+  ('nurse'),
+  ('receptionist')
+ON DUPLICATE KEY UPDATE `Name` = VALUES(`Name`);
+
+-- ── Appointments ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS Appointment (
+  `A-ID`           INT AUTO_INCREMENT PRIMARY KEY,
+  `P-ID`           INT NOT NULL,
+  `D-E-ID`         INT NOT NULL,
+  `R-ID`           INT NULL,
+  `Scheduled-At`  DATETIME,
+  `Status`         ENUM('Scheduled','Completed','Cancelled') DEFAULT 'Scheduled',
+  `Notes`          VARCHAR(200),
+  FOREIGN KEY (`P-ID`)   REFERENCES Patient(`P-ID`) ON DELETE CASCADE,
+  FOREIGN KEY (`D-E-ID`) REFERENCES Doctor(`E-ID`)  ON DELETE CASCADE,
+  FOREIGN KEY (`R-ID`)   REFERENCES Rooms(`R-ID`)   ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- ── Prescriptions ────────────────────────────────────
+CREATE TABLE IF NOT EXISTS Prescription (
+  `PR-ID`       INT AUTO_INCREMENT PRIMARY KEY,
+  `P-ID`        INT NOT NULL,
+  `D-E-ID`      INT NOT NULL,
+  `Created-At` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `Notes`       VARCHAR(500),
+  FOREIGN KEY (`P-ID`)   REFERENCES Patient(`P-ID`) ON DELETE CASCADE,
+  FOREIGN KEY (`D-E-ID`) REFERENCES Doctor(`E-ID`)  ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS Medication (
+  `MED-ID`      INT AUTO_INCREMENT PRIMARY KEY,
+  `Name`        VARCHAR(120) NOT NULL UNIQUE,
+  `Dosage-Form` VARCHAR(80),
+  `Manufacturer` VARCHAR(120)
+) ENGINE=InnoDB;
+
+-- M:N between Prescription and Medication
+CREATE TABLE IF NOT EXISTS PrescriptionItem (
+  `PR-ID`       INT NOT NULL,
+  `MED-ID`      INT NOT NULL,
+  `Dosage`      VARCHAR(100) NOT NULL,
+  `Instructions` VARCHAR(200),
+  PRIMARY KEY (`PR-ID`, `MED-ID`),
+  FOREIGN KEY (`PR-ID`)  REFERENCES Prescription(`PR-ID`) ON DELETE CASCADE,
+  FOREIGN KEY (`MED-ID`) REFERENCES Medication(`MED-ID`)   ON DELETE RESTRICT
+) ENGINE=InnoDB;

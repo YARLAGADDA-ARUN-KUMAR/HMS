@@ -1,9 +1,11 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: '*', allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json());
 
 /* ── DB Connection ────────────────────────────────
@@ -20,6 +22,428 @@ const pool = mysql.createPool({
 
 /* ── Helper ─────────────────────────────────────── */
 const q = (sql, params) => pool.execute(sql, params);
+
+/* ── Auth (JWT) ───────────────────────────────────── */
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+
+const authRequired = async (req, res, next) => {
+  try {
+    const header = req.headers.authorization;
+    if (!header) {
+      return res.status(401).json({ error: 'Missing Authorization header' });
+    }
+
+    const [scheme, token] = header.split(' ');
+    if (scheme !== 'Bearer' || !token) {
+      return res
+        .status(401)
+        .json({ error: 'Invalid Authorization header format' });
+    }
+
+    const payload = jwt.verify(token, JWT_SECRET);
+
+    const [rows] = await q(
+      `
+      SELECT a.\`U-ID\`, a.Username, a.\`Role-ID\`, r.Name AS RoleName
+      FROM AuthUser a
+      JOIN Role r ON a.\`Role-ID\` = r.\`Role-ID\`
+      WHERE a.\`U-ID\` = ? AND a.\`Is-Active\` = 1
+      `,
+      [payload.uid],
+    );
+
+    if (!rows.length) return res.status(401).json({ error: 'Invalid user' });
+
+    req.user = {
+      uid: rows[0]['U-ID'],
+      username: rows[0].Username,
+      roleId: rows[0]['Role-ID'],
+      roleName: rows[0].RoleName,
+    };
+
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+/* ── Auth Routes ──────────────────────────────────── */
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const username = req.body.username ?? req.body.Username;
+    const password = req.body.password ?? req.body.Password;
+    const roleId = req.body['Role-ID'] ?? req.body.roleId ?? req.body.RoleId;
+    const roleName = req.body.roleName ?? req.body.role ?? req.body.Role;
+    const eId = req.body['E-ID'] ?? req.body.eId ?? req.body.employeeId ?? null;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'username and password are required' });
+    }
+
+    let finalRoleId = roleId;
+    if (!finalRoleId) {
+      if (!roleName) {
+        return res.status(400).json({ error: 'roleName or roleId is required' });
+      }
+      const [roleRows] = await q('SELECT `Role-ID` FROM Role WHERE Name = ?', [
+        roleName,
+      ]);
+      if (!roleRows.length) return res.status(400).json({ error: 'Unknown role' });
+      finalRoleId = roleRows[0]['Role-ID'];
+    }
+
+    const PasswordHash = await bcrypt.hash(password, 10);
+
+    const [result] = await q(
+      'INSERT INTO AuthUser (`E-ID`, Username, `Password-Hash`, `Role-ID`) VALUES (?,?,?,?)',
+      [eId, username, PasswordHash, finalRoleId],
+    );
+
+    res.json({ id: result.insertId });
+  } catch (e) {
+    if (e && e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const username = req.body.username ?? req.body.Username;
+    const password = req.body.password ?? req.body.Password;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'username and password are required' });
+    }
+
+    const [rows] = await q(
+      `
+      SELECT a.\`U-ID\`, a.Username, a.\`Password-Hash\`, a.\`Is-Active\`, a.\`Role-ID\`,
+             r.Name AS RoleName
+      FROM AuthUser a
+      JOIN Role r ON a.\`Role-ID\` = r.\`Role-ID\`
+      WHERE a.Username = ?
+      `,
+      [username],
+    );
+
+    if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const user = rows[0];
+    if (user['Is-Active'] !== 1) {
+      return res.status(403).json({ error: 'Account disabled' });
+    }
+
+    const ok = await bcrypt.compare(password, user['Password-Hash']);
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const token = jwt.sign({ uid: user['U-ID'] }, JWT_SECRET, { expiresIn: '2h' });
+
+    res.json({
+      token,
+      user: {
+        uid: user['U-ID'],
+        username: user.Username,
+        roleId: user['Role-ID'],
+        roleName: user.RoleName,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/auth/me', authRequired, async (req, res) => {
+  res.json({ user: req.user });
+});
+
+/* ── Appointments ───────────────────────────────── */
+app.get('/api/appointments', authRequired, async (req, res) => {
+  const [rows] = await q(`
+    SELECT a.\`A-ID\`,
+           a.\`P-ID\`, p.Name AS PatientName,
+           a.\`D-E-ID\`, e.Name AS DoctorName,
+           a.\`R-ID\`, r.Type AS RoomType,
+           a.\`Scheduled-At\`,
+           a.Status,
+           a.Notes
+    FROM Appointment a
+    JOIN Patient p ON a.\`P-ID\` = p.\`P-ID\`
+    JOIN Doctor d ON a.\`D-E-ID\` = d.\`E-ID\`
+    JOIN Employee e ON d.\`E-ID\` = e.\`E-ID\`
+    LEFT JOIN Rooms r ON a.\`R-ID\` = r.\`R-ID\`
+    ORDER BY a.\`A-ID\` DESC
+  `);
+  res.json(rows);
+});
+
+app.get('/api/appointments/:id', authRequired, async (req, res) => {
+  const [rows] = await q(
+    `
+    SELECT a.\`A-ID\`,
+           a.\`P-ID\`, p.Name AS PatientName,
+           a.\`D-E-ID\`, e.Name AS DoctorName,
+           a.\`R-ID\`, r.Type AS RoomType,
+           a.\`Scheduled-At\`,
+           a.Status,
+           a.Notes
+    FROM Appointment a
+    JOIN Patient p ON a.\`P-ID\` = p.\`P-ID\`
+    JOIN Doctor d ON a.\`D-E-ID\` = d.\`E-ID\`
+    JOIN Employee e ON d.\`E-ID\` = e.\`E-ID\`
+    LEFT JOIN Rooms r ON a.\`R-ID\` = r.\`R-ID\`
+    WHERE a.\`A-ID\` = ?
+    `,
+    [req.params.id],
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Not found' });
+  res.json(rows[0]);
+});
+
+app.post('/api/appointments', authRequired, async (req, res) => {
+  try {
+    const pId = req.body['P-ID'] ?? req.body.pId;
+    const dEId = req.body['D-E-ID'] ?? req.body.dEId ?? req.body.doctorEId;
+    const rId = req.body['R-ID'] ?? req.body.rId ?? null;
+    const scheduledAt = req.body['Scheduled-At'] ?? req.body.scheduledAt ?? null;
+    const status = req.body.Status ?? req.body.status ?? 'Scheduled';
+    const notes = req.body.Notes ?? req.body.notes ?? null;
+
+    if (pId === undefined || dEId === undefined) {
+      return res.status(400).json({ error: 'P-ID and D-E-ID are required' });
+    }
+
+    const [result] = await q(
+      'INSERT INTO Appointment (`P-ID`, `D-E-ID`, `R-ID`, `Scheduled-At`, Status, Notes) VALUES (?,?,?,?,?,?)',
+      [pId, dEId, rId, scheduledAt, status, notes],
+    );
+
+    res.json({ id: result.insertId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/appointments/:id', authRequired, async (req, res) => {
+  try {
+    const pId = req.body['P-ID'] ?? req.body.pId;
+    const dEId = req.body['D-E-ID'] ?? req.body.dEId ?? req.body.doctorEId;
+    const rId = req.body['R-ID'] ?? req.body.rId ?? null;
+    const scheduledAt = req.body['Scheduled-At'] ?? req.body.scheduledAt ?? null;
+    const status = req.body.Status ?? req.body.status ?? 'Scheduled';
+    const notes = req.body.Notes ?? req.body.notes ?? null;
+
+    await q(
+      'UPDATE Appointment SET `P-ID`=?, `D-E-ID`=?, `R-ID`=?, `Scheduled-At`=?, Status=?, Notes=? WHERE `A-ID`=?',
+      [pId, dEId, rId, scheduledAt, status, notes, req.params.id],
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/appointments/:id', authRequired, async (req, res) => {
+  await q('DELETE FROM Appointment WHERE `A-ID`=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+/* ── Medication ──────────────────────────────────── */
+app.get('/api/medications', authRequired, async (req, res) => {
+  const [rows] = await q(
+    'SELECT * FROM Medication ORDER BY `MED-ID` DESC',
+  );
+  res.json(rows);
+});
+
+app.get('/api/medications/:id', authRequired, async (req, res) => {
+  const [rows] = await q('SELECT * FROM Medication WHERE `MED-ID` = ?', [
+    req.params.id,
+  ]);
+  if (!rows.length) return res.status(404).json({ error: 'Not found' });
+  res.json(rows[0]);
+});
+
+app.post('/api/medications', authRequired, async (req, res) => {
+  try {
+    const Name = req.body.Name ?? req.body.name;
+    const dosageForm = req.body['Dosage-Form'] ?? req.body.dosageForm ?? null;
+    const Manufacturer =
+      req.body.Manufacturer ?? req.body.manufacturer ?? null;
+
+    if (!Name) return res.status(400).json({ error: 'Name is required' });
+
+    const [result] = await q(
+      'INSERT INTO Medication (Name, `Dosage-Form`, Manufacturer) VALUES (?,?,?)',
+      [Name, dosageForm, Manufacturer],
+    );
+    res.json({ id: result.insertId });
+  } catch (e) {
+    if (e && e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Medication name already exists' });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/medications/:id', authRequired, async (req, res) => {
+  try {
+    const Name = req.body.Name ?? req.body.name;
+    const dosageForm = req.body['Dosage-Form'] ?? req.body.dosageForm ?? null;
+    const Manufacturer =
+      req.body.Manufacturer ?? req.body.manufacturer ?? null;
+
+    await q(
+      'UPDATE Medication SET Name=?, `Dosage-Form`=?, Manufacturer=? WHERE `MED-ID`=?',
+      [Name, dosageForm, Manufacturer, req.params.id],
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/medications/:id', authRequired, async (req, res) => {
+  await q('DELETE FROM Medication WHERE `MED-ID`=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+/* ── Prescriptions ───────────────────────────────── */
+app.get('/api/prescriptions', authRequired, async (req, res) => {
+  const [rows] = await q(`
+    SELECT pr.\`PR-ID\`,
+           pr.\`P-ID\`, p.Name AS PatientName,
+           pr.\`D-E-ID\`, e.Name AS DoctorName,
+           pr.\`Created-At\`,
+           pr.Notes
+    FROM Prescription pr
+    JOIN Patient p ON pr.\`P-ID\` = p.\`P-ID\`
+    JOIN Doctor d ON pr.\`D-E-ID\` = d.\`E-ID\`
+    JOIN Employee e ON d.\`E-ID\` = e.\`E-ID\`
+    ORDER BY pr.\`PR-ID\` DESC
+  `);
+  res.json(rows);
+});
+
+app.get('/api/prescriptions/:id', authRequired, async (req, res) => {
+  const [rows] = await q(
+    `
+    SELECT pr.\`PR-ID\`,
+           pr.\`P-ID\`, p.Name AS PatientName,
+           pr.\`D-E-ID\`, e.Name AS DoctorName,
+           pr.\`Created-At\`,
+           pr.Notes
+    FROM Prescription pr
+    JOIN Patient p ON pr.\`P-ID\` = p.\`P-ID\`
+    JOIN Doctor d ON pr.\`D-E-ID\` = d.\`E-ID\`
+    JOIN Employee e ON d.\`E-ID\` = e.\`E-ID\`
+    WHERE pr.\`PR-ID\` = ?
+    `,
+    [req.params.id],
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Not found' });
+  res.json(rows[0]);
+});
+
+app.post('/api/prescriptions', authRequired, async (req, res) => {
+  try {
+    const pId = req.body['P-ID'] ?? req.body.pId;
+    const dEId = req.body['D-E-ID'] ?? req.body.dEId ?? req.body.doctorEId;
+    const notes = req.body.Notes ?? req.body.notes ?? null;
+
+    if (pId === undefined || dEId === undefined) {
+      return res.status(400).json({ error: 'P-ID and D-E-ID are required' });
+    }
+
+    const [result] = await q(
+      'INSERT INTO Prescription (`P-ID`, `D-E-ID`, Notes) VALUES (?,?,?)',
+      [pId, dEId, notes],
+    );
+    res.json({ id: result.insertId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/prescriptions/:id', authRequired, async (req, res) => {
+  try {
+    const pId = req.body['P-ID'] ?? req.body.pId;
+    const dEId = req.body['D-E-ID'] ?? req.body.dEId ?? req.body.doctorEId;
+    const notes = req.body.Notes ?? req.body.notes ?? null;
+
+    await q(
+      'UPDATE Prescription SET `P-ID`=?, `D-E-ID`=?, Notes=? WHERE `PR-ID`=?',
+      [pId, dEId, notes, req.params.id],
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/prescriptions/:id', authRequired, async (req, res) => {
+  await q('DELETE FROM Prescription WHERE `PR-ID`=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+/* ── Prescription Items ───────────────────────────── */
+app.get('/api/prescriptions/:id/items', authRequired, async (req, res) => {
+  const [rows] = await q(
+    `
+    SELECT pi.\`PR-ID\`,
+           pi.\`MED-ID\`, m.Name AS MedicationName,
+           m.\`Dosage-Form\`,
+           pi.Dosage,
+           pi.Instructions
+    FROM PrescriptionItem pi
+    JOIN Medication m ON pi.\`MED-ID\` = m.\`MED-ID\`
+    WHERE pi.\`PR-ID\` = ?
+    ORDER BY m.Name ASC
+    `,
+    [req.params.id],
+  );
+  res.json(rows);
+});
+
+app.post('/api/prescriptions/:id/items', authRequired, async (req, res) => {
+  try {
+    const medId = req.body['MED-ID'] ?? req.body.medId;
+    const dosage = req.body.Dosage ?? req.body.dosage;
+    const instructions = req.body.Instructions ?? req.body.instructions ?? null;
+
+    if (medId === undefined || dosage === undefined) {
+      return res.status(400).json({ error: 'MED-ID and Dosage are required' });
+    }
+
+    await q(
+      `
+      INSERT INTO PrescriptionItem (\`PR-ID\`, \`MED-ID\`, Dosage, Instructions)
+      VALUES (?,?,?,?)
+      ON DUPLICATE KEY UPDATE
+        Dosage = VALUES(Dosage),
+        Instructions = VALUES(Instructions)
+      `,
+      [req.params.id, medId, dosage, instructions],
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete(
+  '/api/prescriptions/:id/items/:medId',
+  authRequired,
+  async (req, res) => {
+    await q(
+      'DELETE FROM PrescriptionItem WHERE `PR-ID`=? AND `MED-ID`=?',
+      [req.params.id, req.params.medId],
+    );
+    res.json({ ok: true });
+  },
+);
 
 /* ════════════════════════════════════════════════
    PATIENTS

@@ -9,6 +9,28 @@
   <script src="script.js" defer></script>
 </head>
 <body>
+  <!-- LOGIN OVERLAY -->
+  <div id="login-overlay" class="login-overlay active">
+    <!-- Active by default until token is verified -->
+    <div class="login-card">
+      <div class="logo justify-center border-none mb-0 pb-0">
+        <span class="logo-cross">✚</span>
+        <span class="logo-text">MediCore Login</span>
+      </div>
+      <p style="text-align:center; color:var(--muted); margin-bottom: 20px;">Please login to continue</p>
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label>Username</label>
+        <input type="text" id="login-username" placeholder="Enter username" />
+      </div>
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="Enter password" />
+      </div>
+      <button class="btn-primary" style="width: 100%;" onclick="login()">Login</button>
+      <div id="login-error" style="color: var(--danger); text-align: center; margin-top: 10px; font-size: 13px;"></div>
+    </div>
+  </div>
+
   <div class="sidebar">
     <div class="logo">
       <span class="logo-cross">✚</span>
@@ -17,6 +39,9 @@
     <nav>
       <a href="#" class="nav-item active" data-section="dashboard">
         <span class="nav-icon">◈</span> Dashboard
+      </a>
+      <a href="#" class="nav-item" data-section="appointments">
+        <span class="nav-icon">📅</span> Appointments
       </a>
       <a href="#" class="nav-item" data-section="patients">
         <span class="nav-icon">◉</span> Patients
@@ -30,8 +55,14 @@
       <a href="#" class="nav-item" data-section="rooms">
         <span class="nav-icon">▣</span> Rooms
       </a>
+      <a href="#" class="nav-item" data-section="medications">
+        <span class="nav-icon">💊</span> Medications
+      </a>
+      <a href="#" class="nav-item" data-section="prescriptions">
+        <span class="nav-icon">📝</span> Prescriptions
+      </a>
       <a href="#" class="nav-item" data-section="bills">
-        <span class="nav-icon">◈</span> Bills
+        <span class="nav-icon">💰</span> Bills
       </a>
       <a href="#" class="nav-item" data-section="test-reports">
         <span class="nav-icon">◐</span> Test Reports
@@ -50,7 +81,8 @@
         <div class="search-box">
           <input type="text" placeholder="Search…" id="globalSearch" />
         </div>
-        <div class="avatar">A</div>
+        <div class="avatar" id="user-avatar" title="User">A</div>
+        <button class="btn-secondary" style="padding: 6px 12px;" onclick="logout()">Logout</button>
       </div>
     </header>
 
@@ -89,6 +121,20 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- APPOINTMENTS -->
+    <section id="appointments" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Appointments</h2>
+        <button class="btn-primary" onclick="openModal('appointment-modal')">+ Add Appointment</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="appointments-table">
+          <thead><tr><th>A-ID</th><th>Patient</th><th>Doctor</th><th>Room</th><th>Scheduled</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
     </section>
 
@@ -148,6 +194,34 @@
       </div>
     </section>
 
+    <!-- MEDICATIONS -->
+    <section id="medications" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Medications</h2>
+        <button class="btn-primary" onclick="openModal('medication-modal')">+ Add Medication</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="medications-table">
+          <thead><tr><th>MED-ID</th><th>Name</th><th>Dosage Form</th><th>Manufacturer</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PRESCRIPTIONS -->
+    <section id="prescriptions" class="section">
+      <div class="section-toolbar">
+        <h2 class="section-heading">Prescriptions</h2>
+        <button class="btn-primary" onclick="openModal('prescription-modal')">+ Add Prescription</button>
+      </div>
+      <div class="card">
+        <table class="data-table" id="prescriptions-table">
+          <thead><tr><th>PR-ID</th><th>Patient</th><th>Doctor</th><th>Created At</th><th>Notes</th><th>Items</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- BILLS -->
     <section id="bills" class="section">
       <div class="section-toolbar">
@@ -193,6 +267,26 @@
 
   <!-- MODALS -->
   <div class="modal-overlay" id="modal-overlay" onclick="closeModal()"></div>
+
+  <!-- Appointment Modal -->
+  <div class="modal" id="appointment-modal">
+    <div class="modal-header"><span>Appointment Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="a-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Patient ID (P-ID)</label><input type="number" id="a-pid" /></div>
+      <div class="form-group"><label>Doctor ID (D-E-ID)</label><input type="number" id="a-did" /></div>
+      <div class="form-group"><label>Room ID (optional)</label><input type="number" id="a-rid" /></div>
+      <div class="form-group"><label>Scheduled At</label><input type="datetime-local" id="a-scheduled" /></div>
+      <div class="form-group"><label>Status</label>
+        <select id="a-status"><option>Scheduled</option><option>Completed</option><option>Cancelled</option></select>
+      </div>
+      <div class="form-group"><label>Notes</label><input type="text" id="a-notes" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveAppointment()">Save</button>
+    </div>
+  </div>
 
   <!-- Patient Modal -->
   <div class="modal" id="patient-modal">
@@ -273,6 +367,61 @@
     </div>
   </div>
 
+  <!-- Medication Modal -->
+  <div class="modal" id="medication-modal">
+    <div class="modal-header"><span>Medication Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="m-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="m-name" /></div>
+      <div class="form-group"><label>Dosage Form</label><input type="text" id="m-form" placeholder="Tablet, Syrup..." /></div>
+      <div class="form-group"><label>Manufacturer</label><input type="text" id="m-manu" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveMedication()">Save</button>
+    </div>
+  </div>
+
+  <!-- Prescription Modal -->
+  <div class="modal" id="prescription-modal">
+    <div class="modal-header"><span>Prescription</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="pr-id-hidden" />
+    <div class="form-grid">
+      <div class="form-group"><label>Patient ID</label><input type="number" id="pr-pid" /></div>
+      <div class="form-group"><label>Doctor ID</label><input type="number" id="pr-did" /></div>
+      <div class="form-group" style="grid-column: 1 / 3;"><label>Notes</label><input type="text" id="pr-notes" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="savePrescription()">Save</button>
+    </div>
+  </div>
+
+  <!-- Prescription Items Modal -->
+  <div class="modal" id="prescription-items-modal" style="width: 600px;">
+    <div class="modal-header"><span id="pri-title">Prescription Items</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <input type="hidden" id="pri-prid-hidden" />
+    
+    <div style="background: var(--bg); padding: 10px; border-radius: var(--radius); margin-bottom: 15px; border: 1px solid var(--border);">
+      <h4 style="margin-bottom: 10px; font-size: 13px;">Add / Update Item</h4>
+      <div class="form-grid" style="margin-bottom: 0;">
+        <div class="form-group"><label>Medication ID</label><input type="number" id="pri-medid" /></div>
+        <div class="form-group"><label>Dosage</label><input type="text" id="pri-dosage" placeholder="1x daily..." /></div>
+        <div class="form-group" style="grid-column: 1 / 3;"><label>Instructions</label><input type="text" id="pri-instructions" /></div>
+      </div>
+      <div style="text-align: right; margin-top: 10px;">
+        <button class="btn-primary" onclick="savePrescriptionItem()">Add Item</button>
+      </div>
+    </div>
+
+    <div class="card" style="max-height: 200px; overflow-y: auto;">
+      <table class="data-table" id="prescription-items-table">
+        <thead><tr><th>Medication</th><th>Dosage</th><th>Inst.</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Bill Modal -->
   <div class="modal" id="bill-modal">
     <div class="modal-header"><span>Bill Details</span><button class="modal-close" onclick="closeModal()">✕</button></div>
@@ -317,7 +466,6 @@
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>
-
 
 </body>
 </html>
