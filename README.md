@@ -1,264 +1,128 @@
-# HMS — Hospital Management System
+# MediCore HMS — Hospital Management System
 
-A full-stack Hospital Management System built with Node.js, Express, MySQL, and vanilla JavaScript. Manage patients, doctors, rooms, appointments, prescriptions, and medications efficiently.
+A full-stack, comprehensive Hospital Management System built with Node.js, Express, MySQL, and vanilla JavaScript. Featuring a premium dark glassmorphism UI, real-time analytics, and a rock-solid relational database foundation.
 
 ---
 
-## 📁 Project Structure
+## 🎯 Database Management Systems (DBMS) Core Concepts
 
-```
-HMS/
-├── client/
-│   ├── index.html       ← Main UI with multi-section dashboard
-│   ├── style.css        ← Dark theme responsive styles
-│   └── script.js        ← Fetch-based API client with CRUD operations
-├── server/
-│   ├── server.js        ← Express REST API (Node.js)
-│   ├── schema.sql       ← MySQL schema + seed data
-│   └── package.json     ← Node.js dependencies
-└── README.md            ← This file
-```
+This project serves as a practical implementation of advanced **Database Management System (DBMS)** principles. It heavily focuses on data integrity, relational mapping, and normalization.
+
+### 1. Database Normalization (3rd Normal Form - 3NF)
+The schema has been thoroughly normalized up to the **3rd Normal Form (3NF)** to eliminate redundancy and prevent insertion, update, and deletion anomalies.
+*   **1NF & 2NF:** All tables have atomic values, primary keys, and no partial dependencies on composite keys.
+*   **3NF Implementation:** Removed all transitive dependencies. Previously string-based attributes like `Doctor.Dept` and `Medication.Manufacturer` were extracted into their own independent entities: **`Department`** and **`Supplier`**. Now, entities reference them strictly via Foreign Keys (`Dept-ID` and `Sup-ID`), ensuring updates to a department or supplier name cascade uniformly across the system.
+
+### 2. Supertype / Subtype (ISA) Hierarchy
+The system successfully models inheritance in a relational database using the **Supertype / Subtype (ISA)** pattern.
+*   **Supertype:** `Employee` (storing shared attributes: `E-ID`, Name, Salary, Contact, Address).
+*   **Subtypes:** `Doctor` and `Nurse`. 
+*   **Mechanism:** Both sub-entities use `E-ID` as both their Primary Key and Foreign Key referencing the `Employee` table. 
+
+### 3. Entity-Relationship (ER) Modeling & Cardinality
+The ER mapping incorporates all fundamental relationship types:
+*   **1:N (One-to-Many):** One `Patient` can have many `Bill` records. One `Department` has many `Employee` records. One `Supplier` supplies many `Medication` variants.
+*   **M:N (Many-to-Many):** `PrescriptionItem` serves as an associative (junction) table resolving the M:N relationship between `Prescription` and `Medication`. `Consults` resolves M:N between `Patient` and `Doctor`.
+*   **1:1 (One-to-One):** `Appointment` and `Bill` maintain an optional 1:1 linkage to trace payments strictly back to specific clinical encounters.
+
+### 4. Integrity Constraints
+Strict **Referential Integrity** and **Domain Integrity** constraints are enforced at the database schema level.
+*   **Foreign Keys (FK):** Enforces entity relationships. We use `ON DELETE CASCADE` (e.g., deleting a patient deletes their bills) and `ON DELETE SET NULL` (e.g., deleting a room clears the room from scheduled appointments without deleting the appointment).
+*   **Data Validation:** `UNIQUE` keys, `ENUM` constraints (Shift, Status, Gender), and `UNSIGNED` integers are utilized to prevent anomalous data writes.
+
+### 5. ACID Properties & Transaction Management
+*   **Atomicity:** Creating new inherited entities (like a Doctor or Nurse) requires inserting data into both `Employee` and `Doctor`/`Nurse` tables. The server uses explicit **MySQL Transactions** (`CONNECTION.beginTransaction()`, `COMMIT`, `ROLLBACK`) to guarantee atomicity.
+*   **Consistency:** The database seamlessly transitions from one valid state to another.
+*   **Isolation & Durability:** Supported implicitly by the default InnoDB storage engine.
+
+---
+
+## 🗄️ Database Schema Directory
+
+### 11 Core Entities + Associative Tables
+
+#### Staff Management
+*   **Employee**: `E-ID` (PK), Name, Salary, Contact Info, `Dept-ID` (FK).
+*   **Doctor**: `E-ID` (PK/FK), Qualification, Sex.
+*   **Nurse**: `E-ID` (PK/FK), License-No, Shift.
+*   **Department**: `Dept-ID` (PK), Name, Description, Head-Count.
+
+#### Patient & Operations Management
+*   **Patient**: `P-ID` (PK), Name, DOB, Age, Gender, Blood-Group, Contact Info.
+*   **Appointment**: `A-ID` (PK), `P-ID` (FK), `D-E-ID` (FK), `R-ID` (FK), Scheduled-At, Status.
+*   **Rooms**: `R-ID` (PK), Type, Capacity, Floor, Daily-Rate, Availability.
+*   **Bill**: `Bill-ID` (PK), `P-ID` (FK), `A-ID` (FK), Amount, Status, Issued-At.
+
+#### Clinical & Inventory Management
+*   **Medication**: `MED-ID` (PK), Name, Dosage-Form, `Sup-ID` (FK), Unit-Price, Stock-Qty.
+*   **Prescription**: `PR-ID` (PK), `P-ID` (FK), `D-E-ID` (FK), Created-At, Notes.
+*   **PrescriptionItem (M:N Associative)**: `PR-ID` (PK/FK), `MED-ID` (PK/FK), Dosage, Instructions.
+*   **Supplier**: `Sup-ID` (PK), Name, Contact, Email, Address.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
-- Node.js (v14+)
-- MySQL (v5.7+)
+- Node.js (v18+)
+- MySQL (v5.7+ or v8.0+)
 - npm
 
 ### 1. Database Setup
-
 ```bash
 # Login to MySQL
 mysql -u root -p
 
-# Run the schema (creates DB, tables, and sample data)
+# Run the 3NF schema (creates DB, tables, and sample data)
 mysql -u root -p < server/schema.sql
-
-# Verify: List tables in hospital_db
-USE hospital_db;
-SHOW TABLES;
 ```
-
-Sample data includes:
-
-- 4 Patients
-- 2 Doctors (Cardiology & Orthopedics)
-- 4 Rooms (General, ICU, Private, Semi-Private)
-- 4 Appointments
-- 8 Medications
-- 4 Prescriptions with 8 prescription items
 
 ### 2. Backend Setup
-
 ```bash
 cd server
-
-# Install dependencies
 npm install
 
-# Update MySQL credentials in server.js (line ~15) if needed:
-#   host: 'localhost'
-#   user: 'root'
-#   password: 'your_password'  ← Update this
-#   database: 'hospital_db'
-
+# Update the database password on lines 16 & 21 in server/server.js if needed.
 # Start the development server
 npm run dev
-# → API running at http://localhost:3000
-
-# Or start with node directly:
-npm start
+# OR
+node server.js
 ```
 
-### 3. Frontend
-
+### 3. Frontend Application
+Because the frontend runs a premium UI utilizing modular CSS variables and a heavy ES6 script logic architecture, it is best served via a Live Server, or by directly opening the file:
 ```bash
-# Open in browser (from HMS root directory)
-# Method 1: Open directly
-open client/index.html
-
-# Method 2: Use VS Code Live Server or similar
-# Make sure the backend is running on http://localhost:3000
+# Double click the file or open it in the browser:
+file://<path-to-project>/client/index.html
 ```
 
-**Note:** The frontend communicates with the backend via REST API, so the server must be running.
-
 ---
 
-## 📡 API Endpoints
-
-### Core Resources
-
-| Resource      | GET all                | GET one                    | POST                    | PUT                        | DELETE                        |
-| ------------- | ---------------------- | -------------------------- | ----------------------- | -------------------------- | ----------------------------- |
-| Patients      | GET /api/patients      | GET /api/patients/:id      | POST /api/patients      | PUT /api/patients/:id      | DELETE /api/patients/:id      |
-| Doctors       | GET /api/doctors       | GET /api/doctors/:id       | POST /api/doctors       | PUT /api/doctors/:id       | DELETE /api/doctors/:id       |
-| Rooms         | GET /api/rooms         | GET /api/rooms/:id         | POST /api/rooms         | PUT /api/rooms/:id         | DELETE /api/rooms/:id         |
-| Appointments  | GET /api/appointments  | GET /api/appointments/:id  | POST /api/appointments  | PUT /api/appointments/:id  | DELETE /api/appointments/:id  |
-| Prescriptions | GET /api/prescriptions | GET /api/prescriptions/:id | POST /api/prescriptions | PUT /api/prescriptions/:id | DELETE /api/prescriptions/:id |
-| Medications   | GET /api/medications   | GET /api/medications/:id   | POST /api/medications   | PUT /api/medications/:id   | DELETE /api/medications/:id   |
-
-### Prescription Items (Nested Resource)
-
-| Operation                           | Endpoint                                   | Method |
-| ----------------------------------- | ------------------------------------------ | ------ |
-| Get all items in prescription       | GET /api/prescriptions/:id/items           | GET    |
-| Add medication to prescription      | POST /api/prescriptions/:id/items          | POST   |
-| Remove medication from prescription | DELETE /api/prescriptions/:id/items/:medId | DELETE |
-
----
-
-## 🗄️ Database Schema
-
-### Core Tables
-
-#### Patient
-
-- `P-ID` (INT, PK)
-- `Name` (VARCHAR)
-- `DOB` (DATE)
-- `Age` (TINYINT)
-- `Gender` (ENUM: Male, Female, Other)
-- `Mob-No` (CHAR)
-
-#### Employee (Supertype)
-
-- `E-ID` (INT, PK)
-- `Name` (VARCHAR)
-- `Salary` (DECIMAL)
-- `Mob-No` (CHAR)
-- `Address`, `City`, `State`, `Pin-no` (VARCHAR)
-
-#### Doctor (ISA relationship with Employee)
-
-- `E-ID` (INT, PK, FK)
-- `Dept` (VARCHAR)
-- `Qualification` (VARCHAR)
-- `Sex` (ENUM: Male, Female, Other)
-
-#### Rooms
-
-- `R-ID` (INT, PK)
-- `Type` (VARCHAR)
-- `Capacity` (TINYINT)
-- `Availability` (TINYINT, Boolean)
-
-#### Appointment
-
-- `A-ID` (INT, PK)
-- `P-ID` (INT, FK → Patient)
-- `D-E-ID` (INT, FK → Doctor)
-- `R-ID` (INT, FK → Rooms, optional)
-- `Scheduled-At` (DATETIME)
-- `Status` (ENUM: Scheduled, Completed, Cancelled)
-- `Notes` (VARCHAR)
-
-#### Medication
-
-- `MED-ID` (INT, PK)
-- `Name` (VARCHAR, UNIQUE)
-- `Dosage-Form` (VARCHAR)
-- `Manufacturer` (VARCHAR)
-
-#### Prescription
-
-- `PR-ID` (INT, PK)
-- `P-ID` (INT, FK → Patient)
-- `D-E-ID` (INT, FK → Doctor)
-- `Created-At` (DATETIME)
-- `Notes` (VARCHAR)
-
-#### PrescriptionItem (M:N between Prescription & Medication)
-
-- `PR-ID` (INT, PK, FK)
-- `MED-ID` (INT, PK, FK)
-- `Dosage` (VARCHAR)
-- `Instructions` (VARCHAR)
-
-#### Junction Tables
-
-- **Consults**: M:N relationship between Patient ↔ Doctor
-- **Assigned**: Patient → Room assignment
-
----
-
-## 🎨 Features
-
-✅ **Patient Management**
-
-- Add, view, update, delete patient records
-- Track patient demographics (DOB, Age, Gender, Contact)
-
-✅ **Doctor Management**
-
-- Employee-Doctor inheritance model
-- Department and qualification tracking
-- Full CRUD operations
-
-✅ **Room Management**
-
-- Track room types and capacity
-- Monitor room availability
-
-✅ **Appointment Scheduling**
-
-- Link patients with doctors and rooms
-- Track appointment status (Scheduled, Completed, Cancelled)
-- Include appointment notes
-
-✅ **Medication Catalog**
-
-- Maintain medication database
-- Track dosage forms and manufacturers
-
-✅ **Prescription Management**
-
-- Create prescriptions linked to patients and doctors
-- Add multiple medications to a single prescription
-- Specify dosage and instructions for each medication
-- Complete prescription item management (add/remove medications)
-
-✅ **Responsive UI**
-
-- Dark theme dashboard
-- Multi-section navigation
-- Real-time data updates
-- Form-based CRUD operations
+## 🎨 Frontend UI / UX Overhaul
+The application features a fully modernized interface:
+*   **Dark Glassmorphism Theme:** Provides a high-end, premium look with deep contrasts and responsive elements.
+*   **Analytics Grid:** Every section incorporates visual progress bars, metrics, and KPI statistic cards directly linked to aggregated MySQL dashboard counts.
+*   **Dynamic Layout:** Incorporates a collapsible sidebar with micro-animations and instantaneous client-side searching / table filtering.
+*   **Modular Modals:** Reusable, fully populated drop-down mapping (using active backend queries instead of hardcodes) for intuitive CRUD workflows.
 
 ---
 
 ## 🔧 Technology Stack
 
-| Layer     | Technology                      |
-| --------- | ------------------------------- |
-| Frontend  | HTML5, CSS3, Vanilla JavaScript |
-| Backend   | Node.js, Express.js             |
-| Database  | MySQL (InnoDB)                  |
-| API Style | RESTful                         |
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | HTML5, Vanilla JavaScript (ES6+), Vanilla CSS3 (Custom Variables / Grid / Flex / Glassmorphism) |
+| **Backend** | Express.js (Node.js REST API), JSON Web Token (JWT) Authentication |
+| **Database** | MySQL (InnoDB Engine), `mysql2/promise` connection pooling |
 
 ---
 
-## 💾 Sample Data
+## 📡 Core API Coverage
+The Express server securely exposes routes behind Bearer JWT verification for reading and mutating database states.
 
-The `schema.sql` file includes seed data:
+*   **Auth:** `/api/auth/login`
+*   **Dashboards:** `/api/dashboard`
+*   **CRUD Routes:** Completely standard mapping across all entities. 
+    *   *Examples:* `/api/patients`, `/api/doctors`, `/api/nurses`, `/api/departments`, `/api/bills`, `/api/suppliers`, `/api/medications`, `/api/prescriptions`, `/api/rooms`, `/api/appointments`.
 
-- **4 Patients**: Diverse demographics for testing
-- **2 Doctors**: Cardiology and Orthopedics departments
-- **4 Rooms**: Various room types
-- **4 Appointments**: Connected to patients and doctors
-- **8 Medications**: Common pharmaceutical drugs
-- **4 Prescriptions**: With medication assignments
-
----
-
-## 📝 Notes
-
-- The backend uses MySQL connection pooling for efficiency
-- All table names use backticks to handle hyphens in column names
-- Foreign key constraints ensure referential integrity
-- Transactions are used for multi-table doctor operations
-- CORS is enabled for frontend-backend communication
+*Note: All endpoints implement resilient server-side crash guarding and return appropriate JSON HTTP error statuses.*
