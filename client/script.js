@@ -13,7 +13,7 @@ try { user = JSON.parse(localStorage.getItem('user')); } catch (e) {}
 
 /* ── Cache ──────────────────────────────────────────────────── */
 let _patients = [], _doctors = [], _rooms = [], _medications = [],
-    _suppliers = [], _departments = [], _appointments = [];
+    _departments = [], _appointments = [];
 
 /* ══════════════════════════════════════════════════════════════
    INIT
@@ -118,13 +118,11 @@ const sectionMap = {
   appointments:  'Appointments',
   patients:      'Patients',
   doctors:       'Doctors',
-  nurses:        'Nurses',
   departments:   'Departments',
   rooms:         'Rooms',
   medications:   'Medications',
   bills:         'Bills & Invoices',
   prescriptions: 'Prescriptions',
-  suppliers:     'Suppliers',
 };
 
 function initNavigation() {
@@ -154,13 +152,11 @@ function loadSection(name) {
     case 'appointments':  loadAppointments();  break;
     case 'patients':      loadPatients();      break;
     case 'doctors':       loadDoctors();       break;
-    case 'nurses':        loadNurses();        break;
     case 'departments':   loadDepartments();   break;
     case 'rooms':         loadRooms();         break;
     case 'medications':   loadMedications();   break;
     case 'bills':         loadBills();         break;
     case 'prescriptions': loadPrescriptions(); break;
-    case 'suppliers':     loadSuppliers();     break;
   }
 }
 
@@ -290,7 +286,7 @@ async function loadDashboard() {
     document.getElementById('kpi-doctors').textContent      = c.doctors;
     document.getElementById('kpi-rooms').textContent        = c.availableRooms;
     document.getElementById('kpi-pending').textContent      = c.pendingBills;
-    document.getElementById('kpi-nurses').textContent       = c.nurses;
+    document.getElementById('kpi-prescriptions').textContent = c.prescriptions;
     document.getElementById('kpi-appointments').textContent = c.scheduledAppointments;
     document.getElementById('kpi-meds').textContent         = c.medications || '–';
     document.getElementById('kpi-revenue').textContent      = '₹'+Number(c.totalRevenuePaid||0).toLocaleString('en-IN');
@@ -561,8 +557,6 @@ async function editDoctor(id) {
     document.getElementById('d-mob').value        = d['Mob-No'] || '';
     document.getElementById('d-city').value       = d.City || '';
     document.getElementById('d-state').value      = d.State || '';
-    document.getElementById('d-pin').value        = d['Pin-no'] || '';
-    document.getElementById('d-address').value    = d.Address || '';
     document.getElementById('doctor-modal-title').textContent = 'Edit Doctor';
     openModal('doctor-modal');
   } catch (e) { showToast('Could not load doctor', true); }
@@ -585,8 +579,6 @@ async function saveDoctor() {
     'Mob-No':      document.getElementById('d-mob').value || null,
     City:          document.getElementById('d-city').value || null,
     State:         document.getElementById('d-state').value || null,
-    'Pin-no':      document.getElementById('d-pin').value || null,
-    Address:       document.getElementById('d-address').value || null,
   };
   try {
     if (id) await apiCall(`/doctors/${id}`, 'PUT', payload);
@@ -602,96 +594,6 @@ async function deleteDoctor(id) {
     await apiCall(`/doctors/${id}`, 'DELETE');
     showToast('Doctor deleted');
     loadDoctors(); loadDashboard();
-  } catch (e) { showToast('Error deleting', true); }
-}
-
-/* ══════════════════════════════════════════════════════════════
-   NURSES  (New Entity)
-══════════════════════════════════════════════════════════════ */
-async function loadNurses() {
-  try {
-    const rows = await apiCall('/nurses');
-    const shiftCount = (s) => rows.filter(n => n.Shift === s).length;
-
-    renderStatCards('nurse-stats', [
-      { icon: '👩‍⚕️', label: 'Total Nurses',  value: rows.length,           color: '#a855f7' },
-      { icon: '🌅',   label: 'Morning',        value: shiftCount('Morning'), color: '#ffb347' },
-      { icon: '🌆',   label: 'Evening',        value: shiftCount('Evening'), color: '#6c63ff' },
-      { icon: '🌙',   label: 'Night',          value: shiftCount('Night'),   color: '#00d4ff' },
-    ]);
-
-    const tbody = document.querySelector('#nurses-table tbody');
-    tbody.innerHTML = rows.map(n => `
-      <tr>
-        <td class="id-cell">${n['E-ID']}</td>
-        <td><strong>${n.Name}</strong></td>
-        <td>${n.DeptName ? `<span class="badge badge-violet">${n.DeptName}</span>` : '–'}</td>
-        <td><span class="badge badge-gray">${n['License-No'] || '–'}</span></td>
-        <td>${shiftBadge(n.Shift)}</td>
-        <td>₹${Number(n.Salary||0).toLocaleString('en-IN')}</td>
-        <td>${n['Mob-No'] || '–'}</td>
-        <td><div class="row-actions">
-          <button class="btn-icon btn-edit" onclick="editNurse(${n['E-ID']})" title="Edit">✎</button>
-          <button class="btn-icon btn-del"  onclick="deleteNurse(${n['E-ID']})" title="Delete">✕</button>
-        </div></td>
-      </tr>`).join('') || emptyRow(8);
-  } catch (e) { showToast('Error loading nurses', true); }
-}
-
-async function editNurse(id) {
-  try {
-    await loadDepartmentsIntoSelect('n-dept-id');
-    const n = await apiCall(`/nurses/${id}`);
-    document.getElementById('n-id-hidden').value  = n['E-ID'];
-    document.getElementById('n-name').value       = n.Name;
-    setSelectValue('n-dept-id', n['Dept-ID'] ?? '');
-    document.getElementById('n-license').value    = n['License-No'] || '';
-    setSelectValue('n-shift', n.Shift || 'Morning');
-    document.getElementById('n-salary').value     = n.Salary ?? '';
-    document.getElementById('n-mob').value        = n['Mob-No'] || '';
-    document.getElementById('n-city').value       = n.City || '';
-    document.getElementById('n-state').value      = n.State || '';
-    document.getElementById('n-pin').value        = n['Pin-no'] || '';
-    document.getElementById('n-address').value    = n.Address || '';
-    document.getElementById('nurse-modal-title').textContent = 'Edit Nurse';
-    openModal('nurse-modal');
-  } catch (e) { showToast('Could not load nurse', true); }
-}
-
-async function openNurseModal() {
-  await loadDepartmentsIntoSelect('n-dept-id');
-  document.getElementById('nurse-modal-title').textContent = 'New Nurse';
-  openModal('nurse-modal');
-}
-
-async function saveNurse() {
-  const id = document.getElementById('n-id-hidden').value;
-  const payload = {
-    Name:          document.getElementById('n-name').value,
-    'Dept-ID':     document.getElementById('n-dept-id').value || null,
-    'License-No':  document.getElementById('n-license').value || null,
-    Shift:         document.getElementById('n-shift').value || 'Morning',
-    Salary:        document.getElementById('n-salary').value || null,
-    'Mob-No':      document.getElementById('n-mob').value || null,
-    City:          document.getElementById('n-city').value || null,
-    State:         document.getElementById('n-state').value || null,
-    'Pin-no':      document.getElementById('n-pin').value || null,
-    Address:       document.getElementById('n-address').value || null,
-  };
-  try {
-    if (id) await apiCall(`/nurses/${id}`, 'PUT', payload);
-    else    await apiCall('/nurses', 'POST', payload);
-    showToast('Nurse saved ✓');
-    closeModal(); loadNurses(); loadDashboard();
-  } catch (e) { showToast('Error: ' + e.message, true); }
-}
-
-async function deleteNurse(id) {
-  if (!confirm('Delete nurse #' + id + '?')) return;
-  try {
-    await apiCall(`/nurses/${id}`, 'DELETE');
-    showToast('Nurse deleted');
-    loadNurses(); loadDashboard();
   } catch (e) { showToast('Error deleting', true); }
 }
 
@@ -856,7 +758,7 @@ async function loadMedications() {
         <td class="id-cell">${m['MED-ID']}</td>
         <td><strong>${m.Name}</strong></td>
         <td><span class="badge badge-gray">${m['Dosage-Form'] || '–'}</span></td>
-        <td>${m.SupplierName || '–'}</td>
+        <td>${m.Supplier || '–'}</td>
         <td>₹${Number(m['Unit-Price']||0).toFixed(2)}</td>
         <td>${Number(m['Stock-Qty']||0) < 100 ? `<span class="badge badge-red">${m['Stock-Qty']} ⚠</span>` : `<span class="badge badge-green">${m['Stock-Qty']||0}</span>`}</td>
         <td><div class="row-actions">
@@ -869,12 +771,11 @@ async function loadMedications() {
 
 async function editMedication(id) {
   try {
-    await loadSuppliersIntoSelect('m-sup-id');
     const m = await apiCall(`/medications/${id}`);
     document.getElementById('m-id-hidden').value = m['MED-ID'];
     document.getElementById('m-name').value       = m.Name;
     document.getElementById('m-form').value       = m['Dosage-Form'] || '';
-    setSelectValue('m-sup-id', m['Sup-ID'] ?? '');
+    document.getElementById('m-supplier').value = m.Supplier || '';
     document.getElementById('m-price').value      = m['Unit-Price'] ?? 0;
     document.getElementById('m-stock').value      = m['Stock-Qty'] ?? 0;
     document.getElementById('medication-modal-title').textContent = 'Edit Medication';
@@ -883,7 +784,6 @@ async function editMedication(id) {
 }
 
 async function openMedicationModal() {
-  await loadSuppliersIntoSelect('m-sup-id');
   document.getElementById('medication-modal-title').textContent = 'New Medication';
   openModal('medication-modal');
 }
@@ -893,7 +793,7 @@ async function saveMedication() {
   const payload = {
     Name:          document.getElementById('m-name').value,
     'Dosage-Form': document.getElementById('m-form').value || null,
-    'Sup-ID':      document.getElementById('m-sup-id').value || null,
+    Supplier:      document.getElementById('m-supplier').value || null,
     'Unit-Price':  document.getElementById('m-price').value || 0,
     'Stock-Qty':   document.getElementById('m-stock').value || 0,
   };
@@ -1124,79 +1024,6 @@ async function deletePrescriptionItem(prId, medId) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   SUPPLIERS  (New Entity)
-══════════════════════════════════════════════════════════════ */
-async function loadSuppliers() {
-  try {
-    const rows = await apiCall('/suppliers');
-    _suppliers = rows;
-    const states = [...new Set(rows.map(s => s.State).filter(Boolean))].length;
-
-    renderStatCards('sup-stats', [
-      { icon: '🏭', label: 'Total Suppliers', value: rows.length, color: '#6c63ff' },
-      { icon: '🗺️', label: 'States Covered',  value: states,      color: '#10d988' },
-    ]);
-
-    const tbody = document.querySelector('#suppliers-table tbody');
-    tbody.innerHTML = rows.map(s => `
-      <tr>
-        <td class="id-cell">${s['Sup-ID']}</td>
-        <td><strong>${s.Name}</strong></td>
-        <td>${s.ContactNo || '–'}</td>
-        <td>${s.Email || '–'}</td>
-        <td>${s.City || '–'}</td>
-        <td>${s.State || '–'}</td>
-        <td><div class="row-actions">
-          <button class="btn-icon btn-edit" onclick="editSupplier(${s['Sup-ID']})" title="Edit">✎</button>
-          <button class="btn-icon btn-del"  onclick="deleteSupplier(${s['Sup-ID']})" title="Delete">✕</button>
-        </div></td>
-      </tr>`).join('') || emptyRow(7);
-  } catch (e) { showToast('Error loading suppliers', true); }
-}
-
-async function editSupplier(id) {
-  try {
-    const s = await apiCall(`/suppliers/${id}`);
-    document.getElementById('s-id-hidden').value = s['Sup-ID'];
-    document.getElementById('s-name').value      = s.Name;
-    document.getElementById('s-contact').value   = s.ContactNo || '';
-    document.getElementById('s-email').value     = s.Email || '';
-    document.getElementById('s-city').value      = s.City || '';
-    document.getElementById('s-state').value     = s.State || '';
-    document.getElementById('s-address').value   = s.Address || '';
-    document.getElementById('supplier-modal-title').textContent = 'Edit Supplier';
-    openModal('supplier-modal');
-  } catch (e) { showToast('Could not load supplier', true); }
-}
-
-async function saveSupplier() {
-  const id = document.getElementById('s-id-hidden').value;
-  const payload = {
-    Name:      document.getElementById('s-name').value,
-    ContactNo: document.getElementById('s-contact').value || null,
-    Email:     document.getElementById('s-email').value || null,
-    City:      document.getElementById('s-city').value || null,
-    State:     document.getElementById('s-state').value || null,
-    Address:   document.getElementById('s-address').value || null,
-  };
-  try {
-    if (id) await apiCall(`/suppliers/${id}`, 'PUT', payload);
-    else    await apiCall('/suppliers', 'POST', payload);
-    showToast('Supplier saved ✓');
-    closeModal(); loadSuppliers();
-  } catch (e) { showToast('Error: ' + e.message, true); }
-}
-
-async function deleteSupplier(id) {
-  if (!confirm('Delete supplier #' + id + '?')) return;
-  try {
-    await apiCall(`/suppliers/${id}`, 'DELETE');
-    showToast('Supplier deleted');
-    loadSuppliers();
-  } catch (e) { showToast('Error deleting', true); }
-}
-
-/* ══════════════════════════════════════════════════════════════
    DROPDOWN POPULATION HELPERS
 ══════════════════════════════════════════════════════════════ */
 async function populateDropdowns() {
@@ -1245,17 +1072,6 @@ async function loadDepartmentsIntoSelect(selectId) {
   const curVal = sel.value;
   sel.innerHTML = `<option value="">— Select Department —</option>` +
     depts.map(d => `<option value="${d['Dept-ID']}">${d.Name}</option>`).join('');
-  if (curVal) sel.value = curVal;
-}
-
-async function loadSuppliersIntoSelect(selectId) {
-  const sups = await apiCall('/suppliers').catch(() => []);
-  _suppliers = sups;
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  const curVal = sel.value;
-  sel.innerHTML = `<option value="">— None —</option>` +
-    sups.map(s => `<option value="${s['Sup-ID']}">${s.Name}</option>`).join('');
   if (curVal) sel.value = curVal;
 }
 
@@ -1332,11 +1148,6 @@ function genderBadge(g) {
   return `<span class="badge ${map[g]||'badge-gray'}">${g}</span>`;
 }
 
-function shiftBadge(s) {
-  const map = { Morning: 'badge-amber', Evening: 'badge-blue', Night: 'badge-gray' };
-  return `<span class="badge ${map[s]||'badge-gray'}">${s||'–'}</span>`;
-}
-
 /* ══════════════════════════════════════════════════════════════
    BUTTON onclick overrides (HTML uses these)
 ══════════════════════════════════════════════════════════════ */
@@ -1352,10 +1163,6 @@ window.openModal = async function(id) {
     await populateBillDropdowns().catch(() => {});
   } else if (id === 'doctor-modal') {
     await loadDepartmentsIntoSelect('d-dept-id').catch(() => {});
-  } else if (id === 'nurse-modal') {
-    await loadDepartmentsIntoSelect('n-dept-id').catch(() => {});
-  } else if (id === 'medication-modal') {
-    await loadSuppliersIntoSelect('m-sup-id').catch(() => {});
   }
   _origOpenModal(id);
 };

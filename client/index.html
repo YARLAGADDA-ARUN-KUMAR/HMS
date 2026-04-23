@@ -86,10 +86,6 @@
         <span class="nav-icon">👨‍⚕️</span>
         <span class="nav-label">Doctors</span>
       </a>
-      <a class="nav-item" data-section="nurses" href="#" id="nav-nurses">
-        <span class="nav-icon">👩‍⚕️</span>
-        <span class="nav-label">Nurses</span>
-      </a>
       <a class="nav-item" data-section="departments" href="#" id="nav-departments">
         <span class="nav-icon">🏢</span>
         <span class="nav-label">Departments</span>
@@ -103,10 +99,6 @@
       <a class="nav-item" data-section="medications" href="#" id="nav-medications">
         <span class="nav-icon">💊</span>
         <span class="nav-label">Medications</span>
-      </a>
-      <a class="nav-item" data-section="suppliers" href="#" id="nav-suppliers">
-        <span class="nav-icon">🏭</span>
-        <span class="nav-label">Suppliers</span>
       </a>
     </nav>
 
@@ -190,10 +182,10 @@
         <!-- Second KPI Row -->
         <div class="kpi-row" style="margin-bottom:24px;">
           <div class="stat-card" style="--card-color: #a855f7">
-            <div class="stat-icon-wrap">👩‍⚕️</div>
+            <div class="stat-icon-wrap">📝</div>
             <div class="stat-body">
-              <div class="stat-label">Nurses</div>
-              <div class="stat-value" id="kpi-nurses">–</div>
+              <div class="stat-label">Prescriptions</div>
+              <div class="stat-value" id="kpi-prescriptions">–</div>
             </div>
           </div>
           <div class="stat-card" style="--card-color: #ff4d6d">
@@ -394,45 +386,6 @@
         </div>
       </section>
 
-      <!-- ═══════════════ NURSES ════════════════ -->
-      <section id="nurses" class="section">
-        <div class="section-header">
-          <div class="section-title-wrap">
-            <div class="section-title">Nurses</div>
-            <div class="section-subtitle">Nursing staff and shift management</div>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-primary" onclick="openModal('nurse-modal')">＋ Add Nurse</button>
-          </div>
-        </div>
-        <div class="stat-grid" id="nurse-stats" style="margin-bottom:20px;"></div>
-        <div class="filter-bar">
-          <div class="filter-search">
-            <span class="f-icon">🔍</span>
-            <input type="text" id="nurse-search" placeholder="Search nurses…" oninput="filterTable('nurses-table', this.value)"/>
-          </div>
-          <select class="filter-select" id="nurse-shift-filter" onchange="filterTable('nurses-table', document.getElementById('nurse-search').value)">
-            <option value="">All Shifts</option>
-            <option>Morning</option>
-            <option>Evening</option>
-            <option>Night</option>
-          </select>
-        </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table class="data-table" id="nurses-table">
-              <thead>
-                <tr>
-                  <th>E-ID</th><th>Name</th><th>Department</th><th>License No.</th>
-                  <th>Shift</th><th>Salary</th><th>Mobile</th><th>Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
       <!-- ═══════════════ DEPARTMENTS ════════════════ -->
       <section id="departments" class="section">
         <div class="section-header">
@@ -606,38 +559,6 @@
         </div>
       </section>
 
-      <!-- ═══════════════ SUPPLIERS ════════════════ -->
-      <section id="suppliers" class="section">
-        <div class="section-header">
-          <div class="section-title-wrap">
-            <div class="section-title">Suppliers</div>
-            <div class="section-subtitle">Pharmaceutical supplier management (3NF)</div>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-primary" onclick="openModal('supplier-modal')">＋ Add Supplier</button>
-          </div>
-        </div>
-        <div class="stat-grid" id="sup-stats" style="margin-bottom:20px;"></div>
-        <div class="filter-bar">
-          <div class="filter-search">
-            <span class="f-icon">🔍</span>
-            <input type="text" id="sup-search" placeholder="Search suppliers…" oninput="filterTable('suppliers-table', this.value)"/>
-          </div>
-        </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table class="data-table" id="suppliers-table">
-              <thead>
-                <tr>
-                  <th>Sup-ID</th><th>Name</th><th>Contact</th><th>Email</th><th>City</th><th>State</th><th>Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app-layout -->
@@ -780,78 +701,11 @@
         <label>State</label>
         <input type="text" id="d-state" />
       </div>
-      <div class="form-group">
-        <label>Pin Code</label>
-        <input type="text" id="d-pin" maxlength="6" />
-      </div>
-      <div class="form-group span-2">
-        <label>Address</label>
-        <input type="text" id="d-address" placeholder="Full address" />
-      </div>
     </div>
   </div>
   <div class="modal-footer">
     <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
     <button class="btn btn-primary" onclick="saveDoctor()">Save Doctor</button>
-  </div>
-</div>
-
-<!-- Nurse Modal -->
-<div class="modal modal-wide" id="nurse-modal">
-  <div class="modal-header">
-    <div class="modal-title" id="nurse-modal-title">New Nurse</div>
-    <button class="modal-close" onclick="closeModal()">✕</button>
-  </div>
-  <div class="modal-body">
-    <input type="hidden" id="n-id-hidden" />
-    <div class="form-grid">
-      <div class="form-group span-2">
-        <label>Full Name</label>
-        <input type="text" id="n-name" placeholder="Nurse full name" />
-      </div>
-      <div class="form-group">
-        <label>Department</label>
-        <select id="n-dept-id"></select>
-      </div>
-      <div class="form-group">
-        <label>License No.</label>
-        <input type="text" id="n-license" placeholder="e.g. NL-HYD-001" />
-      </div>
-      <div class="form-group">
-        <label>Shift</label>
-        <select id="n-shift">
-          <option>Morning</option><option>Evening</option><option>Night</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Salary (₹)</label>
-        <input type="number" id="n-salary" placeholder="e.g. 42000" />
-      </div>
-      <div class="form-group">
-        <label>Mobile No.</label>
-        <input type="text" id="n-mob" placeholder="10-digit" maxlength="10"/>
-      </div>
-      <div class="form-group">
-        <label>City</label>
-        <input type="text" id="n-city" />
-      </div>
-      <div class="form-group">
-        <label>State</label>
-        <input type="text" id="n-state" />
-      </div>
-      <div class="form-group">
-        <label>Pin Code</label>
-        <input type="text" id="n-pin" maxlength="6"/>
-      </div>
-      <div class="form-group span-2">
-        <label>Address</label>
-        <input type="text" id="n-address" placeholder="Full address" />
-      </div>
-    </div>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveNurse()">Save Nurse</button>
   </div>
 </div>
 
@@ -943,7 +797,7 @@
       </div>
       <div class="form-group">
         <label>Supplier</label>
-        <select id="m-sup-id"><option value="">— None —</option></select>
+        <input type="text" id="m-supplier" placeholder="e.g. Bayer Pharma" />
       </div>
       <div class="form-group">
         <label>Unit Price (₹)</label>
@@ -1065,47 +919,6 @@
         </table>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- Supplier Modal -->
-<div class="modal" id="supplier-modal">
-  <div class="modal-header">
-    <div class="modal-title" id="supplier-modal-title">New Supplier</div>
-    <button class="modal-close" onclick="closeModal()">✕</button>
-  </div>
-  <div class="modal-body">
-    <input type="hidden" id="s-id-hidden" />
-    <div class="form-grid">
-      <div class="form-group span-2">
-        <label>Company Name</label>
-        <input type="text" id="s-name" placeholder="e.g. Bayer Pharma" />
-      </div>
-      <div class="form-group">
-        <label>Contact No.</label>
-        <input type="text" id="s-contact" placeholder="10-digit" maxlength="10" />
-      </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="s-email" placeholder="contact@company.com" />
-      </div>
-      <div class="form-group">
-        <label>City</label>
-        <input type="text" id="s-city" />
-      </div>
-      <div class="form-group">
-        <label>State</label>
-        <input type="text" id="s-state" />
-      </div>
-      <div class="form-group span-2">
-        <label>Address</label>
-        <input type="text" id="s-address" placeholder="Full address" />
-      </div>
-    </div>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveSupplier()">Save Supplier</button>
   </div>
 </div>
 
